@@ -1,0 +1,67 @@
+[
+ {
+  "key": "1",
+  "name": "1호선",
+  "color": "#0052A4",
+  "variants": [
+   "line1"
+  ]
+ },
+ {
+  "key": "2",
+  "name": "2호선",
+  "color": "#00A84D",
+  "variants": [
+   "line2"
+  ]
+ },
+ {
+  "key": "3",
+  "name": "3호선",
+  "color": "#EF7C1C",
+  "variants": [
+   "line3"
+  ]
+ },
+ {
+  "key": "4",
+  "name": "4호선",
+  "color": "#00A5DE",
+  "variants": [
+   "line4"
+  ]
+ },
+ {
+  "key": "5",
+  "name": "5호선",
+  "color": "#996CAC",
+  "variants": [
+   "line5",
+   "line5m"
+  ]
+ },
+ {
+  "key": "6",
+  "name": "6호선",
+  "color": "#CD7C2F",
+  "variants": [
+   "line6"
+  ]
+ },
+ {
+  "key": "7",
+  "name": "7호선",
+  "color": "#747F00",
+  "variants": [
+   "line7"
+  ]
+ },
+ {
+  "key": "8",
+  "name": "8호선",
+  "color": "#E6186C",
+  "variants": [
+   "line8"
+  ]
+ }
+]

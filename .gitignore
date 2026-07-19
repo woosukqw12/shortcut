@@ -1,0 +1,7 @@
+node_modules
+dist
+.env
+*.tsbuildinfo
+# 대용량 원천 데이터 — data-pipeline/fetch.ts 로 재다운로드
+data-pipeline/raw/ridership2025.csv
+.DS_Store
