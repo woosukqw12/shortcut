@@ -23,7 +23,8 @@ export default function ResultCard({ recommendation, bestCar, totalStops }: Prop
       </p>
       <p className="mt-2 text-sm" style={{ color: "var(--text-secondary)" }}>
         앉을 확률 <strong style={{ color: "var(--text-primary)" }}>{probPct}%</strong>
-        {" · "}
+        {" (출발역에서 바로 "}
+        {Math.min(99, Math.round(recommendation.boardSeatProb * 100))}%){" · "}
         {totalStops}개 역 중 약{" "}
         <strong style={{ color: "var(--text-primary)" }}>{seated.toFixed(1)}개</strong> 구간을
         앉아서 가요

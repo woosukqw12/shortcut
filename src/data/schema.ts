@@ -21,6 +21,8 @@ export const stationSchema = z.object({
   order: z.number().int().min(0),
   /** 시간대별 일평균 하차 인원 */
   alightByHour: byDaySchema,
+  /** 시간대별 일평균 승차 인원 — 출발역 탑승 경쟁(p₀) 추정용 */
+  boardByHour: byDaySchema,
   /** 승하차 통계가 존재하는 역인지 (타 운영사 구간 등은 false) */
   hasRidership: z.boolean(),
   /**

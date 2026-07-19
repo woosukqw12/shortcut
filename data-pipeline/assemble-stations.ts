@@ -31,6 +31,7 @@ export function assembleVariant(
     name: string;
     aliases: string[];
     alightByHour: { weekday: number[]; weekend: number[] } | null;
+    boardByHour: { weekday: number[]; weekend: number[] } | null;
   }
 
   // 1) CSV에서 이 변형의 역번호 범위에 드는 역 추출, 역번호 오름차순
@@ -46,7 +47,13 @@ export function assembleVariant(
         entry.names.flatMap((n) => [n, stripParen(n)]).filter((n) => n !== canonical),
       ),
     ];
-    drafts.push({ id: entry.code, name: canonical, aliases, alightByHour: entry.alightByHour });
+    drafts.push({
+      id: entry.code,
+      name: canonical,
+      aliases,
+      alightByHour: entry.alightByHour,
+      boardByHour: entry.boardByHour,
+    });
   }
   drafts.sort((a, b) => Number(a.id) - Number(b.id));
 
@@ -63,6 +70,7 @@ export function assembleVariant(
   // 3) CSV에 없는 역 삽입 (공용 게이트 환승역·타 운영사 구간)
   for (const ins of variant.insert ?? []) {
     let alight: { weekday: number[]; weekend: number[] } | null = null;
+    let board: { weekday: number[]; weekend: number[] } | null = null;
     if (ins.borrowRidership) {
       const src = ridership.byLineCode.get(
         `${ins.borrowRidership.csvLine}|${ins.borrowRidership.code}`,
@@ -71,12 +79,14 @@ export function assembleVariant(
         throw new Error(`${variant.fileKey}: ${ins.name}의 borrowRidership 원본이 없습니다`);
       }
       alight = src.alightByHour;
+      board = src.boardByHour;
     }
     const draft: Draft = {
       id: ins.id,
       name: ins.name,
       aliases: ins.aliases?.map(stripParen).concat(ins.aliases) ?? [],
       alightByHour: alight,
+      boardByHour: board,
     };
     if (ins.afterCode === null) {
       drafts.unshift(draft);
@@ -100,6 +110,7 @@ export function assembleVariant(
     name: d.name,
     order,
     alightByHour: d.alightByHour ?? zeros(),
+    boardByHour: d.boardByHour ?? zeros(),
     hasRidership: d.alightByHour !== null,
     congestion: { up: congestionOf(d.id, "up"), down: congestionOf(d.id, "down") },
     hotspots: { up: [], down: [] },

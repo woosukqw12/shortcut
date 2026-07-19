@@ -2,13 +2,13 @@
 
 exports[`생성된 노선 데이터 > 실데이터 스모크: 노원→고속터미널(7호선) 출근 스냅샷 1`] = `
 {
-  "expSeatedStops": 16.1,
+  "expSeatedStops": 16.6,
   "position": "1-1",
   "seatProb": 1,
   "top3cars": [
     1,
+    8,
     6,
-    5,
   ],
 }
 `;

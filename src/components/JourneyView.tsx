@@ -114,6 +114,7 @@ export default function JourneyView({ journey, slot, slotLabel, alpha, dayType, 
                   recDoor: rec.door.door,
                   predictedProb: Math.round(rec.seatProb * 100) / 100,
                   predictedExpSeated: Math.round(rec.expSeatedStops * 10) / 10,
+                  predictedBoardProb: Math.round(rec.boardSeatProb * 100) / 100,
                 }}
               />
             )}

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { resolveRoute } from "../src/core/route";
 import { scoreRoute } from "../src/core/scoring";
 import { TIME_SLOTS, hourSlot } from "../src/core/timeslot";
-import { flatAlight, flatCongestion, hotspot, makeLineData, makeStation } from "./helpers";
+import { flatAlight, flatBoard, flatCongestion, hotspot, makeLineData, makeStation } from "./helpers";
 
 const AM = TIME_SLOTS[0];
 
@@ -302,5 +302,66 @@ describe("scoreRoute (확률 모델)", () => {
       expect(c.norm).toBeGreaterThanOrEqual(0);
       expect(c.norm).toBeLessThanOrEqual(100);
     }
+  });
+});
+
+describe("출발역 탑승 시점 p₀", () => {
+  const build = (opts: { cong?: number | null; board?: number; alightAtOrigin?: number }) =>
+    makeLineData([
+      makeStation({
+        id: "o",
+        order: 0,
+        alightByHour: flatAlight(opts.alightAtOrigin ?? 0),
+        boardByHour: flatBoard(opts.board ?? 0),
+        congestion:
+          opts.cong == null
+            ? { up: null, down: null }
+            : { up: flatCongestion(opts.cong), down: flatCongestion(opts.cong) },
+      }),
+      makeStation({
+        id: "s",
+        order: 1,
+        alightByHour: flatAlight(300),
+        hotspots: { up: [], down: [hotspot(3, 2)] },
+      }),
+      makeStation({ id: "d", order: 2 }),
+    ]);
+  const score = (data: ReturnType<typeof build>) =>
+    scoreRoute(resolveRoute("o", "d", data), AM, data);
+
+  it("혼잡도가 낮아 좌석 여유가 있으면 p₀ > 0이고 앉을 확률에 반영된다", () => {
+    const calm = score(build({ cong: 15, board: 100 })); // 재차 24명 < 좌석 54
+    expect(calm.recommendation!.boardSeatProb).toBeGreaterThan(0.5);
+    expect(calm.recommendation!.seatProb).toBeGreaterThanOrEqual(
+      calm.recommendation!.boardSeatProb,
+    );
+    // 바로 앉으면 전 구간 착석 → 기대 착석이 p₀×총구간 이상
+    expect(calm.recommendation!.expSeatedStops).toBeGreaterThanOrEqual(
+      calm.recommendation!.boardSeatProb * 2,
+    );
+  });
+
+  it("극혼잡이고 출발역 하차가 없으면 p₀ ≈ 0", () => {
+    const packed = score(build({ cong: 150, board: 100 }));
+    expect(packed.recommendation!.boardSeatProb).toBe(0);
+  });
+
+  it("승차 경쟁자가 많을수록 p₀가 낮다", () => {
+    const fewRivals = score(build({ cong: 15, board: 50 }));
+    const manyRivals = score(build({ cong: 15, board: 3000 }));
+    expect(fewRivals.recommendation!.boardSeatProb).toBeGreaterThan(
+      manyRivals.recommendation!.boardSeatProb,
+    );
+  });
+
+  it("혼잡도 없으면 p₀ = 0 — 기존 결과와 동일 (회귀 가드)", () => {
+    const noCong = score(build({ cong: null, board: 500 }));
+    expect(noCong.recommendation!.boardSeatProb).toBe(0);
+    expect(noCong.recommendation!.car).toBe(3); // 중간역 hotspot 기반 추천 유지
+  });
+
+  it("극혼잡이어도 출발역 하차가 많으면 그 빈자리로 p₀ > 0", () => {
+    const turnover = score(build({ cong: 150, board: 100, alightAtOrigin: 2000 }));
+    expect(turnover.recommendation!.boardSeatProb).toBeGreaterThan(0);
   });
 });

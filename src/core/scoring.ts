@@ -10,6 +10,11 @@ import type { Direction, DoorId, Route, TimeSlot } from "./types";
  *   - seatProb        : 도착 전까지 한 번이라도 앉을 확률
  *   - expSeatedStops  : 기대 착석 정거장 수 = Σ 생존(s)·p(s)·(남은 정거장 수)
  *
+ * 출발역 탑승 시점도 모델링한다(p₀): 도착 열차의 재차 인원(혼잡도)으로 빈 좌석을,
+ * 출발역 하차로 비는 좌석을 더해 문별 기회를 추정하고, 같은 문으로 타는 승차 인원
+ * (승차 통계 × 문 가중치)과 경쟁시킨다 — p₀ = 1 − exp(−빈자리/(1+κb·경쟁자)).
+ * 혼잡도가 없는 역은 재차 인원을 알 수 없어 p₀=0(보수적 폴백).
+ *
  * 혼잡도 통계(역·방향·요일·시간별 정원 대비 %)가 있으면 실측 보정한다:
  *   - 방향 비율: 하차 통계는 양방향 합산 → 도착 열차의 재차 인원에 비례해 배분
  *     (내 방향 혼잡도 / 양방향 혼잡도 합, 0.15~0.85로 클램프)
@@ -22,8 +27,10 @@ import type { Direction, DoorId, Route, TimeSlot } from "./types";
 
 export interface DoorScore {
   door: DoorId;
-  /** 도착 전까지 앉을 확률 0~1 */
+  /** 도착 전까지 앉을 확률 0~1 (출발역 p₀ 포함) */
   seatProb: number;
+  /** 출발역에서 탑승 직후 바로 앉을 확률 0~1 */
+  boardSeatProb: number;
   /** 기대 착석 정거장 수 */
   expSeatedStops: number;
   /** α 가중 결합 점수 0~1 (순위 기준) */
@@ -60,6 +67,7 @@ export interface Recommendation {
   /** "3-2" 형태 승강장 표기 */
   positionLabel: string;
   seatProb: number;
+  boardSeatProb: number;
   expSeatedStops: number;
 }
 
@@ -111,14 +119,59 @@ function competitionAt(
   return Math.max(1, 1 + params.kappa * standeesPerDoor);
 }
 
-/** 시간대 평균 "열차 1대당" 하차 인원 (방향 비율 적용 전) */
-function alightPerTrain(station: Station, slot: TimeSlot): number {
-  const series = station.alightByHour[slot.dayType];
+/** 시간대 평균 "열차 1대당" 인원 (방향 비율 적용 전) */
+function perTrainAvg(
+  series: { weekday: number[]; weekend: number[] },
+  slot: TimeSlot,
+): number {
+  const byHour = series[slot.dayType];
   let sum = 0;
   for (const h of slot.hours) {
-    sum += (series[hourToIndex(h)] ?? 0) / trainsPerHour(h, slot.dayType);
+    sum += (byHour[hourToIndex(h)] ?? 0) / trainsPerHour(h, slot.dayType);
   }
   return sum / slot.hours.length;
+}
+
+const alightPerTrain = (station: Station, slot: TimeSlot) =>
+  perTrainAvg(station.alightByHour, slot);
+const boardPerTrain = (station: Station, slot: TimeSlot) =>
+  perTrainAvg(station.boardByHour, slot);
+
+/**
+ * 출발역에서 탑승 직후 바로 앉을 확률 (문별).
+ * 빈자리 = 좌석 − 재차 인원(혼잡도 추정, 문 구역 균등) + 출발역 하차자 중 앉아 있던 몫.
+ * 경쟁자 = 같은 문으로 타는 승차 인원 + 차내 입석 인원 — 하차로 비는 자리는 이미
+ * 서 있던 승객이 우선하므로 입석을 경쟁에 넣어야 혼잡 시간대가 과대평가되지 않는다.
+ * 혼잡도 없으면 전부 0 (재차 인원 추정 불가, 보수적 폴백).
+ */
+function boardSeatProbs(
+  origin: Station,
+  dir: Direction,
+  slot: TimeSlot,
+  data: LineData,
+  params: ScoringParams,
+): Float64Array {
+  const doorCount = data.carCount * data.doorsPerCar;
+  const p0 = new Float64Array(doorCount);
+  const cong = meanCongestion(origin, dir, slot);
+  if (cong === null) return p0;
+
+  const occupants = (params.capacityPerCar * cong) / 100;
+  const freeBase = Math.max(0, params.seatsPerCar - occupants) / data.doorsPerCar;
+  const standeesPerDoor = Math.max(0, occupants - params.seatsPerCar) / data.doorsPerCar;
+  const seatedFraction = Math.min(1, params.seatsPerCar / Math.max(occupants, 1));
+  const share = directionShare(origin, dir, slot, params);
+  const alight = alightPerTrain(origin, slot) * share * seatedFraction;
+  const board = boardPerTrain(origin, slot) * share;
+  const w = doorWeightVector(origin, dir, data, params);
+
+  for (let i = 0; i < doorCount; i++) {
+    const free = freeBase + alight * w[i];
+    if (free <= 0) continue;
+    const rivals = board * w[i] + standeesPerDoor;
+    p0[i] = 1 - Math.exp(-free / (1 + params.boardKappa * rivals));
+  }
+  return p0;
 }
 
 export function scoreRoute(
@@ -135,6 +188,15 @@ export function scoreRoute(
   const expSeated = new Float64Array(doorCount);
   // 설명 생성용: 문별 × 중간역별 기대 착석 기여
   const doorStationContrib = route.intermediates.map(() => new Float64Array(doorCount));
+
+  // 출발역 탑승 시점: 바로 앉으면 전 구간 착석
+  const boardDir = route.intermediates[0]?.dir ?? route.direction;
+  const p0 = boardSeatProbs(route.origin, boardDir, slot, data, params);
+  for (let i = 0; i < doorCount; i++) {
+    seatProb[i] = p0[i];
+    expSeated[i] = p0[i] * route.totalStops;
+    survive[i] = 1 - p0[i];
+  }
 
   route.intermediates.forEach(({ station, stopsAway, dir }, sIdx) => {
     if (!station.hasRidership) return; // 통계 없는 역(타 운영사 구간 등)은 기여 0
@@ -166,6 +228,7 @@ export function scoreRoute(
   const doors: DoorScore[] = Array.from({ length: doorCount }, (_, i) => ({
     door: { car: Math.floor(i / data.doorsPerCar) + 1, door: (i % data.doorsPerCar) + 1 },
     seatProb: seatProb[i],
+    boardSeatProb: p0[i],
     expSeatedStops: expSeated[i],
     rankScore: rankScores[i],
     norm: maxRank > 0 ? (rankScores[i] / maxRank) * 100 : 0,
@@ -221,6 +284,7 @@ export function scoreRoute(
       door: d.door,
       positionLabel: `${d.door.car}-${d.door.door}`,
       seatProb: d.seatProb,
+      boardSeatProb: d.boardSeatProb,
       expSeatedStops: d.expSeatedStops,
     };
   }

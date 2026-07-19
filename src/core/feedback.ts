@@ -42,6 +42,8 @@ export interface FeedbackEntryV2 {
   predictedProb: number;
   /** 기대 착석 정거장 예측 */
   predictedExpSeated: number;
+  /** 출발역에서 바로 앉을 확률 예측 (p₀ 도입 이후 기록에만 존재) */
+  predictedBoardProb?: number;
   /** 추천 칸에 실제로 탔는지 — false면 예측-실측 비교에서 제외 */
   boardedRec: boolean;
   outcome: Outcome;

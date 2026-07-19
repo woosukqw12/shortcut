@@ -25,6 +25,7 @@ await page.fill("input[aria-label='출발 시각 선택']", "08:30");
 await page.waitForSelector("text=08:30 기준");
 await page.waitForSelector("text=7호선 · 석남 방면");
 await page.waitForSelector("text=가장 오래 앉아갈 수 있는 위치");
+await page.waitForSelector("text=출발역에서 바로");
 console.log("직행:", (await page.textContent("section >> text=앉을 확률"))?.trim().replace(/\s+/g, " "));
 console.log("직행 칸 수:", await carCount(), "(8 기대)");
 await page.click("text=현재 경로를 출근길로 저장");

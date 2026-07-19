@@ -15,6 +15,8 @@ export interface ScoringParams {
   directionShare: number;
   /** 혼잡도→경쟁 환산: C = 1 + κ·(문 구역 입석 인원) */
   kappa: number;
+  /** 출발역 탑승 경쟁 환산: p₀ = 1 − exp(−빈자리/(1+κb·문별 승차 인원)) */
+  boardKappa: number;
   /** 혼잡도 100% 기준 칸당 정원 (국토부 기준 160명) */
   capacityPerCar: number;
   /** 칸당 좌석 수 (일반 전동차 ~54석, 혼잡도 34% = 좌석 만석) */
@@ -29,6 +31,7 @@ export const DEFAULT_PARAMS: ScoringParams = {
   competition: 3,
   directionShare: 0.5,
   kappa: 0.5,
+  boardKappa: 1,
   capacityPerCar: 160,
   seatsPerCar: 54,
   alpha: 0.3,
