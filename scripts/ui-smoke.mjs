@@ -56,6 +56,8 @@ await page.waitForSelector("text=건대입구에서 2호선 환승");
 await page.waitForSelector("text=환승 통로와 가까운 문은 1-1문");
 console.log("환승 여정:", (await page.textContent("text=환승 1회 · 총"))?.trim().replace(/\s+/g, " "));
 console.log("환승 구간 카드 2개 + 빠른환승 문 위치 OK");
+const widgetCount = await page.locator("text=타 보셨나요").count();
+console.log("구간별 피드백 위젯:", widgetCount, "(2 기대)");
 await page.screenshot({ path: `${shots}/4-transfer.png`, fullPage: true });
 
 // ── 별칭 검색: "총신대입구"로 검색해 이수 선택
@@ -92,9 +94,14 @@ await page.waitForSelector("text=확실히 앉기 우선");
 await page.locator("input[type='range']").fill("30"); // 기본 근처로 복귀
 console.log("선호 슬라이더 동작 OK");
 
+// 피드백 v2: 탑승 위치 체크박스 → 결과 → 착석 위치 후속 질문 → 내보내기 버튼
+await page.waitForSelector("text=추천 칸에 탔어요");
 await page.click("text=🙂 가다가 앉음");
+await page.waitForSelector("text=어디서 앉았어요?");
+await page.click('button >> text="중계"');
 await page.waitForSelector("text=기록됐어요");
-console.log("피드백 기록 OK");
+await page.waitForSelector("text=내보내기");
+console.log("피드백 기록(체크박스·착석 위치·내보내기) OK");
 await page.screenshot({ path: `${shots}/5-stage2.png`, fullPage: true });
 
 if (errors.length) {

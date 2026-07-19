@@ -21,8 +21,8 @@ interface Props {
 }
 
 /**
- * 여정 결과 — 구간마다 착석 추천(주 결과)을 그대로 내고, 환승역의 빠른환승 문 위치는
- * 구간 사이 배너에 부가 정보로 보여준다. 출발 시간 차트·피드백 기록은 직행 여정만 지원.
+ * 여정 결과 — 구간마다 착석 추천(주 결과)과 피드백 위젯을 내고, 환승역의 빠른환승 문
+ * 위치는 구간 사이 배너에 부가 정보로 보여준다. 출발 시간 차트는 직행 여정만 지원.
  * 부모에서 key로 여정 식별자를 넘겨 여정이 바뀌면 칸 선택 상태가 초기화되게 한다.
  */
 export default function JourneyView({ journey, slot, slotLabel, alpha, dayType, onPickHour }: Props) {
@@ -91,6 +91,33 @@ export default function JourneyView({ journey, slot, slotLabel, alpha, dayType, 
 
             {detailCar && <CarDetail car={detailCar} doors={result.doors} />}
 
+            {rec && (
+              <FeedbackWidget
+                queryKey={`${leg.data.line}|${leg.route.origin.id}|${leg.route.destination.id}|${slot.id}|leg${i}`}
+                label={multi ? `${i + 1}구간 · ${leg.data.lineName}` : undefined}
+                intermediates={leg.route.intermediates.map(({ station, stopsAway }) => ({
+                  id: station.id,
+                  name: station.name,
+                  stopsAway,
+                }))}
+                entry={{
+                  line: leg.data.line,
+                  originId: leg.route.origin.id,
+                  destId: leg.route.destination.id,
+                  hour: slot.hours[0],
+                  dayType,
+                  alpha,
+                  totalStops: leg.route.totalStops,
+                  legIndex: i,
+                  transfers: journey.legs.length - 1,
+                  recCar: rec.car,
+                  recDoor: rec.door.door,
+                  predictedProb: Math.round(rec.seatProb * 100) / 100,
+                  predictedExpSeated: Math.round(rec.expSeatedStops * 10) / 10,
+                }}
+              />
+            )}
+
             {next && (
               <div
                 className="rounded-xl border px-4 py-3 text-sm"
@@ -120,22 +147,6 @@ export default function JourneyView({ journey, slot, slotLabel, alpha, dayType, 
           alpha={alpha}
           activeHours={slot.hours}
           onPickHour={onPickHour}
-        />
-      )}
-
-      {single?.result.recommendation && (
-        <FeedbackWidget
-          queryKey={`${single.leg.data.line}|${single.leg.route.origin.id}|${single.leg.route.destination.id}|${slot.id}`}
-          entry={{
-            line: single.leg.data.line,
-            originId: single.leg.route.origin.id,
-            destId: single.leg.route.destination.id,
-            hour: slot.hours[0],
-            dayType,
-            recCar: single.result.recommendation.car,
-            recDoor: single.result.recommendation.door.door,
-            predictedProb: Math.round(single.result.recommendation.seatProb * 100) / 100,
-          }}
         />
       )}
     </div>
