@@ -1,11 +1,19 @@
 import { describe, expect, it } from "vitest";
-import { findEntry, planJourney } from "../src/core/journey";
+import {
+  TRANSFER_PENALTY_STOPS,
+  TRANSFER_WAIT_STOPS,
+  findEntry,
+  planJourney,
+  transferPenaltyStops,
+} from "../src/core/journey";
 import linesIndexRaw from "../src/data/lines.json";
 import stationsIndexRaw from "../src/data/stations-index.json";
+import transfersRaw from "../src/data/transfers.json";
 import {
   lineDataSchema,
   lineIndexSchema,
   stationsIndexSchema,
+  transfersSchema,
   type LineData,
 } from "../src/data/schema";
 
@@ -17,6 +25,7 @@ const allVariants: LineData[] = Object.values(modules).map((m) =>
 );
 const linesIndex = lineIndexSchema.parse(linesIndexRaw);
 const stationsIndex = stationsIndexSchema.parse(stationsIndexRaw);
+const transfers = transfersSchema.parse(transfersRaw);
 
 const variantsByLine = new Map(
   linesIndex.map((l) => [
@@ -28,7 +37,7 @@ const variantsByLine = new Map(
 const plan = (originName: string, destName: string) => {
   const origin = findEntry(stationsIndex, originName)!;
   const dest = findEntry(stationsIndex, destName)!;
-  return planJourney(origin, dest, stationsIndex, variantsByLine);
+  return planJourney(origin, dest, stationsIndex, variantsByLine, transfers);
 };
 
 describe("전역 역 인덱스", () => {
@@ -101,5 +110,44 @@ describe("planJourney", () => {
 
   it("환승 1회로 연결되지 않으면 null: 종각(1호선)→남위례(8호선)", () => {
     expect(plan("종각", "남위례")).toBeNull();
+  });
+});
+
+describe("환승 실측화", () => {
+  it("페널티: 실측 도보 시간이 있으면 초/120 + 대기, 없으면 폴백 3", () => {
+    expect(transferPenaltyStops(undefined)).toBe(TRANSFER_PENALTY_STOPS);
+    expect(
+      transferPenaltyStops({ from: "7", stationId: "x", to: "2", walkSeconds: null, board: {} }),
+    ).toBe(TRANSFER_PENALTY_STOPS);
+    expect(
+      transferPenaltyStops({ from: "7", stationId: "x", to: "2", walkSeconds: 600, board: {} }),
+    ).toBe(600 / 120 + TRANSFER_WAIT_STOPS);
+  });
+
+  it("상봉→강남: 건대입구 환승에 실측 도보 시간과 환승 후 승차위치가 붙는다", () => {
+    const j = plan("상봉", "강남")!;
+    expect(j.legs[0].route.destination.name).toBe("건대입구");
+    expect(j.legs[0].transferWalkSeconds).toBe(152);
+    // 2호선 내선(도착 방향) 기준 환승 통로 앞 위치
+    expect(j.legs[0].transferBoardPos).toEqual({ car: 3, door: 2 });
+    expect(j.legs[1].transferWalkSeconds).toBeNull();
+  });
+
+  it("transfers.json 무결성: 노선 키와 역 id가 실제 데이터를 가리킨다", () => {
+    for (const t of transfers) {
+      for (const key of [t.from, t.to]) {
+        expect(variantsByLine.has(key), `노선 ${key}`).toBe(true);
+      }
+      const onLine = variantsByLine
+        .get(t.from)!
+        .some((v) => v.stations.some((s) => s.id === t.stationId));
+      expect(onLine, `${t.from}호선 ${t.stationId}`).toBe(true);
+      for (const dir of ["up", "down"] as const) {
+        const pos = t.board[dir];
+        if (!pos) continue;
+        const carCount = variantsByLine.get(t.to)![0].carCount;
+        expect(pos.car, `${t.from}→${t.to} ${t.stationId}`).toBeLessThanOrEqual(carCount);
+      }
+    }
   });
 });

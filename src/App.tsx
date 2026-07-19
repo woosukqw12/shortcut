@@ -12,10 +12,12 @@ import { findEntry, planJourney } from "./core/journey";
 import { dayTypeOf, timeSlot } from "./core/timeslot";
 import linesIndexRaw from "./data/lines.json";
 import stationsIndexRaw from "./data/stations-index.json";
+import transfersRaw from "./data/transfers.json";
 import {
   lineDataSchema,
   lineIndexSchema,
   stationsIndexSchema,
+  transfersSchema,
   type DayType,
   type LineData,
 } from "./data/schema";
@@ -30,6 +32,7 @@ function loadAlpha(): number {
 
 const linesIndex = lineIndexSchema.parse(linesIndexRaw);
 const stationsIndex = stationsIndexSchema.parse(stationsIndexRaw);
+const transfers = transfersSchema.parse(transfersRaw);
 const lineMeta = new Map(linesIndex.map((l) => [l.key, l]));
 
 // 노선 변형 JSON은 필요할 때 지연 로드 (전 노선 데이터를 초기 번들에 넣지 않기 위해)
@@ -113,7 +116,7 @@ export default function App() {
   const journey = useMemo(
     () =>
       ready && originEntry && destEntry && originEntry !== destEntry
-        ? planJourney(originEntry, destEntry, stationsIndex, lineCache)
+        ? planJourney(originEntry, destEntry, stationsIndex, lineCache, transfers)
         : null,
     [ready, originEntry, destEntry, lineCache],
   );

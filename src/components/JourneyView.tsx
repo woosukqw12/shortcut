@@ -11,6 +11,14 @@ import FeedbackWidget from "./FeedbackWidget";
 import ResultCard from "./ResultCard";
 import TrainViz from "./TrainViz";
 
+/** 90 → "약 1분 30초", 40 → "약 40초" */
+function walkLabel(seconds: number): string {
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  if (m === 0) return `약 ${s}초`;
+  return s === 0 ? `약 ${m}분` : `약 ${m}분 ${s}초`;
+}
+
 interface Props {
   journey: Journey;
   slot: TimeSlot;
@@ -133,11 +141,18 @@ export default function JourneyView({ journey, slot, slotLabel, alpha, dayType, 
                 <span className="font-medium" style={{ color: "var(--text-primary)" }}>
                   🔄 {leg.route.destination.name}에서 {next.data.lineName} 환승 ·{" "}
                   {directionLabel(next.data, next.route.direction)}
+                  {leg.transferWalkSeconds !== null && ` · 도보 ${walkLabel(leg.transferWalkSeconds)}`}
                 </span>
                 {leg.transferFastDoor && (
                   <span className="block text-xs" style={{ color: "var(--text-muted)" }}>
                     환승 통로와 가까운 문은 {leg.transferFastDoor.car}-{leg.transferFastDoor.door}문
                     — 내리기 직전에 옮겨 서면 갈아타기가 빨라요
+                  </span>
+                )}
+                {leg.transferBoardPos && (
+                  <span className="block text-xs" style={{ color: "var(--text-muted)" }}>
+                    통로에서 나오면 {leg.transferBoardPos.car}-{leg.transferBoardPos.door}문 앞이에요
+                    — 다음 구간 추천 위치까지 거리를 가늠해 보세요
                   </span>
                 )}
               </div>

@@ -9,10 +9,12 @@ import {
   lineDataSchema,
   lineIndexSchema,
   stationsIndexSchema,
+  transfersSchema,
   type LineData,
   type LineIndex,
   type StationsIndex,
 } from "../src/data/schema";
+import { buildTransfers } from "./parse-transfers";
 import { assembleVariant, type VariantStations } from "./assemble-stations";
 import { LINE_DEFS } from "./line-defs";
 import { parseCongestion } from "./parse-congestion";
@@ -54,6 +56,14 @@ for (const entry of ridership.byLineCode.values()) {
 
 // 환승 hotspot 채우기
 applyDoors(variantsByCsvLine);
+
+// 환승 링크 (실측 도보 시간 + 환승 후 승차위치)
+const transfers = transfersSchema.parse(buildTransfers(variantsByCsvLine));
+writeFileSync(join(OUT_DIR, "transfers.json"), JSON.stringify(transfers) + "\n");
+console.log(
+  `✓ transfers.json — 환승 링크 ${transfers.length}개` +
+    ` (도보 시간 ${transfers.filter((t) => t.walkSeconds !== null).length})`,
+);
 
 // 노선 변형별 JSON 출력
 const generatedAt = new Date().toISOString().slice(0, 10);

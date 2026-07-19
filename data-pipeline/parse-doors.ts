@@ -17,16 +17,20 @@ import type { VariantStations } from "./assemble-stations";
 import { stripParen } from "./assemble-stations";
 import { readCsvCp949 } from "./csv";
 
-const TRANSFER_CSV = join(dirname(fileURLToPath(import.meta.url)), "raw", "transfer.csv");
+export const TRANSFER_CSV = join(dirname(fileURLToPath(import.meta.url)), "raw", "transfer.csv");
 
-function lineLabel(rawLine: string): string {
+export function lineLabel(rawLine: string): string {
   return /^\d+$/.test(rawLine) ? `${rawLine}호선` : rawLine;
 }
 
 type Dir = "up" | "down";
 
 /** 방면 역명으로 방향 결정. null이면 해석 불가 */
-function resolveDirection(vs: VariantStations, station: Station, towardRaw: string): Dir | null {
+export function resolveDirection(
+  vs: VariantStations,
+  station: Station,
+  towardRaw: string,
+): Dir | null {
   const towardName = stripParen(towardRaw.replace(/방면$/, "").trim());
   const external = vs.def.externalTerminals?.[towardName];
   const toward = vs.byName.get(towardName);

@@ -1,4 +1,4 @@
-import type { LineData, StationIndexEntry, StationsIndex } from "../data/schema";
+import type { LineData, StationIndexEntry, StationsIndex, TransferLink } from "../data/schema";
 import { resolveRoute } from "./route";
 import type { Route } from "./types";
 
@@ -11,8 +11,18 @@ import type { Route } from "./types";
  * 부가 정보로만 제공한다 (주 추천은 착석 기준이라는 제품 결정).
  */
 
-/** 환승 1회의 도보 이동+대기 시간을 정거장 수로 환산한 페널티 */
+/** 환승 페널티 폴백 (실측 도보 시간이 없는 링크): 도보+대기 ≈ 3정거장 상당 */
 export const TRANSFER_PENALTY_STOPS = 3;
+/** 다음 열차 대기 근사 (배차 절반 ≈ 3분 ≈ 1.5정거장) — 실측 도보에 더한다 */
+export const TRANSFER_WAIT_STOPS = 1.5;
+/** 역간 이동 ≈ 2분 기준으로 도보 시간을 정거장 수로 환산 */
+const SECONDS_PER_STOP = 120;
+
+/** 링크별 환승 페널티 (정거장 상당) — 실측 도보 시간이 있으면 그것 기준 */
+export function transferPenaltyStops(link: TransferLink | undefined): number {
+  if (!link || link.walkSeconds === null) return TRANSFER_PENALTY_STOPS;
+  return link.walkSeconds / SECONDS_PER_STOP + TRANSFER_WAIT_STOPS;
+}
 
 export interface JourneyLeg {
   /** 이 구간이 타는 노선 변형 */
@@ -23,6 +33,10 @@ export interface JourneyLeg {
    * 하차 통계가 아니라 빠른환승 원천 데이터에서 온 부가 정보. 없으면 null
    */
   transferFastDoor: { car: number; door: number } | null;
+  /** 다음 구간이 있을 때: 실측 환승 도보 시간(초). 데이터 없으면 null */
+  transferWalkSeconds: number | null;
+  /** 다음 구간이 있을 때: 환승 통로에서 나오면 서게 되는 다음 노선 위치 (다음 구간 방향 기준) */
+  transferBoardPos: { car: number; door: number } | null;
 }
 
 export interface Journey {
@@ -65,7 +79,9 @@ export function planJourney(
   dest: StationIndexEntry,
   index: StationsIndex,
   variantsByLine: Map<string, LineData[]>,
+  transfers: TransferLink[] = [],
 ): Journey | null {
+  const linkByKey = new Map(transfers.map((t) => [`${t.from}|${t.stationId}|${t.to}`, t]));
   const variantsOf = (lineKey: string) => variantsByLine.get(lineKey) ?? [];
   const idOn = (entry: StationIndexEntry, lineKey: string) =>
     entry.lines.find((l) => l.line === lineKey)?.id ?? null;
@@ -94,7 +110,15 @@ export function planJourney(
       if (!inVariant(v, eo.id) || !inVariant(v, destId)) continue;
       const route = resolveRoute(eo.id, destId, v);
       consider(route.totalStops, () => ({
-        legs: [{ data: v, route, transferFastDoor: null }],
+        legs: [
+          {
+            data: v,
+            route,
+            transferFastDoor: null,
+            transferWalkSeconds: null,
+            transferBoardPos: null,
+          },
+        ],
         totalStops: route.totalStops,
       }));
     }
@@ -115,13 +139,30 @@ export function planJourney(
             const legA = resolveRoute(eo.id, ta, va);
             const legB = resolveRoute(tb, idOn(dest, ed.line)!, vb);
             const stops = legA.totalStops + legB.totalStops;
-            consider(stops + TRANSFER_PENALTY_STOPS, () => ({
-              legs: [
-                { data: va, route: legA, transferFastDoor: fastTransferDoor(legA, vb) },
-                { data: vb, route: legB, transferFastDoor: null },
-              ],
-              totalStops: stops,
-            }));
+            const link = linkByKey.get(`${eo.line}|${ta}|${ed.line}`);
+            consider(stops + transferPenaltyStops(link), () => {
+              // 환승 후 서게 되는 위치는 2구간의 탑승 방향 좌표로 기록돼 있다
+              const boardDir = legB.intermediates[0]?.dir ?? legB.direction;
+              return {
+                legs: [
+                  {
+                    data: va,
+                    route: legA,
+                    transferFastDoor: fastTransferDoor(legA, vb),
+                    transferWalkSeconds: link?.walkSeconds ?? null,
+                    transferBoardPos: link?.board[boardDir] ?? null,
+                  },
+                  {
+                    data: vb,
+                    route: legB,
+                    transferFastDoor: null,
+                    transferWalkSeconds: null,
+                    transferBoardPos: null,
+                  },
+                ],
+                totalStops: stops,
+              };
+            });
           }
         }
       }

@@ -75,6 +75,24 @@ export const lineIndexSchema = z.array(
   }),
 );
 
+/** 환승 링크 (transfers.json) — 노선쌍·역별 실측 환승 정보 (OA-22521) */
+export const transferLinkSchema = z.object({
+  /** 출발(하차) 노선 키와 그 노선에서의 역 id */
+  from: z.string(),
+  stationId: z.string(),
+  /** 갈아탈 노선 키 */
+  to: z.string(),
+  /** 실측 환승 도보 시간(초, 방면 평균). null = 시간 데이터 없음 */
+  walkSeconds: z.number().int().positive().nullable(),
+  /** 환승 통로에서 나오면 서게 되는 대상 노선 위치 — 방향에 따라 좌표가 뒤집힘 */
+  board: z.object({
+    up: z.object({ car: z.number().int().min(1), door: z.number().int().min(1) }).optional(),
+    down: z.object({ car: z.number().int().min(1), door: z.number().int().min(1) }).optional(),
+  }),
+});
+export const transfersSchema = z.array(transferLinkSchema);
+export type TransferLink = z.infer<typeof transferLinkSchema>;
+
 /** 전역 역 인덱스 (stations-index.json) — 역 검색·환승 경로 탐색용, 물리 역 단위 */
 export const stationsIndexSchema = z.array(
   z.object({
