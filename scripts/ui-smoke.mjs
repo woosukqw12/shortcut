@@ -15,7 +15,7 @@ const pickStation = async (label, query, name) => {
 };
 const carCount = () => page.locator("button[aria-label*='번째 칸']").count();
 
-await page.goto("http://localhost:4173/");
+await page.goto("http://localhost:4173/shortcut/");
 await page.waitForSelector("text=어디에 탈까");
 
 // ── 직행 (노선 자동 선택): 노원(4·7호선)→고속터미널(3·7호선)은 7호선, 08:30

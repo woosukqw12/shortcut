@@ -55,17 +55,23 @@ freed_i(s) = [alight(s,h) × 방향비율(s,h) / 시간당 열차 수] × W_s[i]
 앉음/못 앉음)은 예측 확률과 실제 결과를 localStorage에 쌓아, 추후 경쟁 상수 C·α
 기본값을 실측으로 보정할 근거가 된다.
 
-## 실행
+## 실행·배포
 
 ```bash
 npm install
 npm run dev        # 개발 서버
 npm test           # 단위 테스트 (core는 전부 순수 함수)
-npm run build      # 정적 빌드 (dist/) — 아무 정적 호스팅에나 배포 가능
+npm run build      # 정적 빌드 (dist/, base=/shortcut/)
 ```
 
 UI 스모크 테스트(스크린샷 포함): `npm run preview` 실행 후
 `node scripts/ui-smoke.mjs <스크린샷 저장 경로>`
+
+**배포**: https://woosukqw12.github.io/shortcut/ — `main` 푸시마다 GitHub Actions가
+테스트→빌드→GitHub Pages 배포(`.github/workflows/deploy.yml`). **PWA**라 폰 브라우저에서
+"홈 화면에 추가"하면 앱처럼 열리고, 서비스워커가 방문한 화면·노선 데이터를 캐시해
+지하철 안 오프라인에서도 동작한다 (HTML은 network-first라 새 배포가 우선).
+아이콘 재생성: `node scripts/gen-icons.mjs`
 
 ## 데이터 파이프라인
 
