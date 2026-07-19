@@ -5,6 +5,8 @@ interface Props {
   cars: CarScore[];
   doorsPerCar: number;
   recommendation: Recommendation | null;
+  /** 사실상 동점인 다른 칸 (점선 강조) */
+  alternates?: Recommendation[];
   selectedCar: number | null;
   onSelectCar: (car: number) => void;
 }
@@ -13,6 +15,7 @@ export default function TrainViz({
   cars,
   doorsPerCar,
   recommendation,
+  alternates = [],
   selectedCar,
   onSelectCar,
 }: Props) {
@@ -27,6 +30,7 @@ export default function TrainViz({
       <div className="flex gap-0.5">
         {cars.map((c) => {
           const isBest = recommendation?.car === c.car;
+          const isAlternate = alternates.some((a) => a.car === c.car);
           const isSelected = selectedCar === c.car;
           const fill = heatColor(spread(c.norm));
           const ink = heatInk(spread(c.norm));
@@ -43,8 +47,10 @@ export default function TrainViz({
                   ? "3px solid var(--accent)"
                   : isSelected
                     ? "2px solid var(--text-muted)"
-                    : "1px solid var(--border)",
-                outlineOffset: isBest || isSelected ? 1 : -1,
+                    : isAlternate
+                      ? "2px dashed var(--accent)"
+                      : "1px solid var(--border)",
+                outlineOffset: isBest || isAlternate || isSelected ? 1 : -1,
               }}
             >
               <div className="text-center">

@@ -76,8 +76,13 @@ export interface ScoreResult {
   cars: CarScore[];
   /** 중간 역이 없거나(인접 역) 하차 데이터가 전무하면 null */
   recommendation: Recommendation | null;
+  /** 1위와 사실상 동점(점수 차 TIE_EPSILON 이내)인 다른 칸의 최고 문 — 최대 2개 */
+  alternates: Recommendation[];
   totalStops: number;
 }
+
+/** 이 비율 이내 점수 차이는 동점으로 취급 — 통계 추정 오차보다 작은 차이라 의미 없음 */
+export const TIE_EPSILON = 0.02;
 
 /** 시간대 평균 혼잡도(%). 데이터 없으면 null */
 function meanCongestion(station: Station, dir: Direction, slot: TimeSlot): number | null {
@@ -275,19 +280,30 @@ export function scoreRoute(
     };
   });
 
+  const toRec = (d: DoorScore): Recommendation => ({
+    car: d.door.car,
+    door: d.door,
+    positionLabel: `${d.door.car}-${d.door.door}`,
+    seatProb: d.seatProb,
+    boardSeatProb: d.boardSeatProb,
+    expSeatedStops: d.expSeatedStops,
+  });
+
   let recommendation: Recommendation | null = null;
+  const alternates: Recommendation[] = [];
   if (maxRank > 0) {
     const bestIdx = rankScores.indexOf(maxRank);
-    const d = doors[bestIdx];
-    recommendation = {
-      car: d.door.car,
-      door: d.door,
-      positionLabel: `${d.door.car}-${d.door.door}`,
-      seatProb: d.seatProb,
-      boardSeatProb: d.boardSeatProb,
-      expSeatedStops: d.expSeatedStops,
-    };
+    recommendation = toRec(doors[bestIdx]);
+    // 다른 칸의 최고 문이 사실상 동점이면 함께 추천 (사용자는 가까운 쪽을 고르면 된다)
+    alternates.push(
+      ...bestDoorOfCar
+        .filter((i) => doors[i].door.car !== recommendation!.car)
+        .filter((i) => rankScores[i] >= maxRank * (1 - TIE_EPSILON))
+        .sort((a, b) => rankScores[b] - rankScores[a])
+        .slice(0, 2)
+        .map((i) => toRec(doors[i])),
+    );
   }
 
-  return { doors, cars, recommendation, totalStops: route.totalStops };
+  return { doors, cars, recommendation, alternates, totalStops: route.totalStops };
 }

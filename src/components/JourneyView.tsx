@@ -61,7 +61,12 @@ export default function JourneyView({ journey, slot, slotLabel, alpha, dayType, 
             )}
 
             {rec && bestCar ? (
-              <ResultCard recommendation={rec} bestCar={bestCar} totalStops={result.totalStops} />
+              <ResultCard
+                recommendation={rec}
+                alternates={result.alternates}
+                bestCar={bestCar}
+                totalStops={result.totalStops}
+              />
             ) : (
               <section
                 className="rounded-xl border p-5 text-sm"
@@ -82,6 +87,7 @@ export default function JourneyView({ journey, slot, slotLabel, alpha, dayType, 
                 cars={result.cars}
                 doorsPerCar={leg.data.doorsPerCar}
                 recommendation={rec}
+                alternates={result.alternates}
                 selectedCar={selected}
                 onSelectCar={(car) =>
                   setSelectedCars((prev) => ({ ...prev, [i]: car === selected ? null : car }))

@@ -365,3 +365,54 @@ describe("출발역 탑승 시점 p₀", () => {
     expect(turnover.recommendation!.boardSeatProb).toBeGreaterThan(0);
   });
 });
+
+describe("동점 근접 복수 추천", () => {
+  it("대칭 hotspot이면 다른 칸의 최고 문이 동점 대안으로 나온다", () => {
+    const data = makeLineData([
+      makeStation({ id: "o", order: 0 }),
+      makeStation({
+        id: "s",
+        order: 1,
+        alightByHour: flatAlight(60),
+        // 열차 중심 기준 대칭 위치 → 두 문 점수가 동일해야 한다
+        hotspots: { up: [], down: [hotspot(2, 2), hotspot(7, 3)] },
+      }),
+      makeStation({ id: "d", order: 2 }),
+    ]);
+    const result = scoreRoute(resolveRoute("o", "d", data), AM, data);
+    expect(result.alternates.length).toBeGreaterThanOrEqual(1);
+    const cars = [result.recommendation!.car, ...result.alternates.map((a) => a.car)];
+    expect(cars).toContain(2);
+    expect(cars).toContain(7);
+  });
+
+  it("확실한 1위가 있으면 대안이 없다", () => {
+    const data = makeLineData([
+      makeStation({ id: "o", order: 0 }),
+      makeStation({
+        id: "s",
+        order: 1,
+        alightByHour: flatAlight(60),
+        hotspots: { up: [], down: [hotspot(3, 2)] },
+      }),
+      makeStation({ id: "d", order: 2 }),
+    ]);
+    const result = scoreRoute(resolveRoute("o", "d", data), AM, data);
+    expect(result.recommendation!.car).toBe(3);
+    expect(result.alternates).toEqual([]);
+  });
+
+  it("대안은 최대 2개, 1위와 같은 칸은 제외된다", () => {
+    // 하차가 전무한 균등 상황: 모든 칸이 동점이어도 대안은 2개까지만
+    const data = makeLineData([
+      makeStation({ id: "o", order: 0 }),
+      makeStation({ id: "s", order: 1, alightByHour: flatAlight(60) }),
+      makeStation({ id: "d", order: 2 }),
+    ]);
+    const result = scoreRoute(resolveRoute("o", "d", data), AM, data);
+    expect(result.alternates.length).toBeLessThanOrEqual(2);
+    for (const a of result.alternates) {
+      expect(a.car).not.toBe(result.recommendation!.car);
+    }
+  });
+});

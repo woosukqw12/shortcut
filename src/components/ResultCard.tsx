@@ -2,11 +2,13 @@ import type { CarScore, Recommendation } from "../core/scoring";
 
 interface Props {
   recommendation: Recommendation;
+  /** 1위와 사실상 동점인 다른 칸 위치 */
+  alternates: Recommendation[];
   bestCar: CarScore;
   totalStops: number;
 }
 
-export default function ResultCard({ recommendation, bestCar, totalStops }: Props) {
+export default function ResultCard({ recommendation, alternates, bestCar, totalStops }: Props) {
   const probPct = Math.min(99, Math.round(recommendation.seatProb * 100));
   const seated = recommendation.expSeatedStops;
   return (
@@ -21,6 +23,14 @@ export default function ResultCard({ recommendation, bestCar, totalStops }: Prop
         {recommendation.car}번째 칸 ·{" "}
         <span style={{ color: "var(--accent)" }}>{recommendation.positionLabel}문</span> 앞
       </p>
+      {alternates.length > 0 && (
+        <p className="mt-1 text-sm" style={{ color: "var(--text-secondary)" }}>
+          <strong style={{ color: "var(--text-primary)" }}>
+            {alternates.map((a) => `${a.positionLabel}문`).join(", ")}
+          </strong>
+          도 사실상 동점이에요 — 승강장에서 가까운 쪽으로 타세요
+        </p>
+      )}
       <p className="mt-2 text-sm" style={{ color: "var(--text-secondary)" }}>
         앉을 확률 <strong style={{ color: "var(--text-primary)" }}>{probPct}%</strong>
         {" (출발역에서 바로 "}
